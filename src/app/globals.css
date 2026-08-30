@@ -1,26 +1,241 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --bg-primary: #0D0D0D;
+  --surface-card: #161616;
+  --surface-elevated: #242424;
+  --accent-primary: #38BDF8;
+  --accent-secondary: #3ECFFF;
+  --accent-danger: #FF4E4E;
+  --accent-success: #3EFF9A;
+  --text-primary: #F5F5F5;
+  --text-secondary: #8E8E93;
+  --border-subtle: #262626;
+  --border-active: #3E3E3E;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ==========================================================================
+   LIGHT MODE OVERRIDES — Full Theme Switch (Light Background & Dark Text)
+   ========================================================================== */
+html.light {
+  --bg-primary: #F4F6F8;
+  --surface-card: #FFFFFF;
+  --surface-elevated: #F8FAFC;
+  --accent-primary: #0284C7;
+  --accent-secondary: #38BDF8;
+  --accent-danger: #DC2626;
+  --accent-success: #16A34A;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --border-subtle: #E2E8F0;
+  --border-active: #CBD5E1;
+}
+
+html.light,
+html.light body,
+html.light .bg-\[\#0D0D0D\],
+html.light .bg-\[\#0A0A0A\],
+html.light .bg-\[\#0E0E0E\] {
+  background-color: #F4F6F8 !important;
+  color: #0F172A !important;
+}
+
+/* Structural Components (Sidebar, Header, Nav) */
+html.light aside,
+html.light header,
+html.light nav,
+html.light footer {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  color: #0F172A !important;
+}
+
+/* All Cards, Panels & Modals in Light Mode -> PURE WHITE BACKGROUND */
+html.light .bg-\[\#111822\],
+html.light .bg-\[\#122329\],
+html.light .bg-\[\#1A1828\],
+html.light .bg-\[\#12291E\],
+html.light .bg-\[\#131E29\],
+html.light .bg-\[\#1A2212\],
+html.light .bg-\[\#121212\],
+html.light .bg-\[\#141414\],
+html.light .bg-\[\#161616\],
+html.light .bg-\[\#171717\],
+html.light .bg-\[\#181818\],
+html.light .bg-\[\#1A1A1A\],
+html.light .bg-\[\#1C1C1C\],
+html.light .bg-\[\#1D1D1D\],
+html.light .bg-\[\#1F1F1F\] {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  color: #0F172A !important;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05) !important;
+}
+
+/* Secondary Inputs, Badges, Inner Boxes -> SOFT LIGHT GRAY BACKGROUND */
+html.light .bg-\[\#0D141C\],
+html.light .bg-\[\#0A0F14\],
+html.light .bg-\[\#0E0E0E\]\/80,
+html.light .bg-\[\#0D141C\]\/90,
+html.light .bg-\[\#111\],
+html.light .bg-\[\#222\],
+html.light .bg-\[\#242424\],
+html.light .bg-\[\#282828\],
+html.light .bg-\[\#2A2A2A\],
+html.light .bg-\[\#2E2E2E\],
+html.light .bg-\[\#333\] {
+  background-color: #F8FAFC !important;
+  border-color: #E2E8F0 !important;
+  color: #0F172A !important;
+}
+
+/* Gradients in Light Mode -> Clean Crisp Light Surfaces */
+html.light .from-\[\#171717\],
+html.light .from-\[\#171A13\],
+html.light .from-\[\#141E28\],
+html.light .from-\[\#1A1828\],
+html.light .from-\[\#122329\],
+html.light .from-\[\#12291E\],
+html.light .from-\[\#131E29\],
+html.light .from-\[\#1A2212\] {
+  --tw-gradient-from: #FFFFFF !important;
+}
+
+html.light .via-\[\#141414\],
+html.light .via-\[\#141812\],
+html.light .via-\[\#141E28\],
+html.light .via-\[\#161616\],
+html.light .via-\[\#181224\] {
+  --tw-gradient-stops: #FFFFFF, #F8FAFC !important;
+}
+
+html.light .to-\[\#171717\],
+html.light .to-\[\#171A13\],
+html.light .to-\[\#141E28\],
+html.light .to-\[\#141414\],
+html.light .to-\[\#121212\] {
+  --tw-gradient-to: #F1F5F9 !important;
+}
+
+/* Borders in Light Mode -> Light Subtle Gray */
+html.light .border-\[\#1E1E1E\],
+html.light .border-\[\#222\],
+html.light .border-\[\#222222\],
+html.light .border-\[\#233547\],
+html.light .border-\[\#242424\],
+html.light .border-\[\#262626\],
+html.light .border-\[\#282828\],
+html.light .border-\[\#2A2A2A\],
+html.light .border-\[\#2E2E2E\],
+html.light .border-\[\#333\],
+html.light .border-\[\#383838\],
+html.light .border-\[\#38BDF8\]\/20,
+html.light .border-\[\#38BDF8\]\/25,
+html.light .border-\[\#38BDF8\]\/30 {
+  border-color: #E2E8F0 !important;
+}
+
+/* ==========================================================================
+   TEXT COLOR HIERARCHY — All Dark Crisp Fonts in Light Mode
+   ========================================================================== */
+html.light .text-white {
+  color: #0F172A !important;
+}
+
+html.light h1,
+html.light h2,
+html.light h3,
+html.light h4,
+html.light h5,
+html.light h6 {
+  color: #0F172A !important;
+}
+
+html.light .text-neutral-200,
+html.light .text-neutral-300 {
+  color: #1E293B !important;
+}
+
+html.light .text-neutral-400 {
+  color: #475569 !important;
+}
+
+html.light .text-neutral-500 {
+  color: #64748B !important;
+}
+
+html.light .text-neutral-600 {
+  color: #334155 !important;
+}
+
+/* Form Controls in Light Mode */
+html.light input,
+html.light select,
+html.light textarea {
+  background-color: #F8FAFC !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94A3B8 !important;
+}
+
+html.light select option {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+}
+
+/* Hover States in Light Mode */
+html.light .hover\:bg-\[\#1A1A1A\]:hover,
+html.light .hover\:bg-\[\#181818\]:hover,
+html.light .hover\:bg-\[\#222\]:hover,
+html.light .hover\:bg-\[\#242424\]:hover,
+html.light .hover\:bg-\[\#252525\]:hover,
+html.light .hover\:bg-\[\#282828\]:hover,
+html.light .hover\:bg-\[\#2A2A2A\]:hover {
+  background-color: #F1F5F9 !important;
+}
+
+/* Progress bar track */
+html.light .bg-\[\#222222\],
+html.light .bg-\[\#222\],
+html.light .bg-\[\#1C1C1C\] {
+  background-color: #E2E8F0 !important;
+}
+
+/* Typography styles */
+.font-display {
+  font-family: var(--font-display), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.font-mono-num {
+  font-family: var(--font-mono), monospace;
+  font-feature-settings: "tnum";
+}
+
+/* Custom modern scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-active);
+  border-radius: 9999px;
 }
