@@ -1,6 +1,12 @@
 import { Pool } from 'pg';
 
-const connectionString = process.env.DATABASE_URL || "postgresql://postgres.xfbkytsfbebkbiiyoxts:money-tracker122@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true";
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error(
+    'DATABASE_URL environment variable is not set. Copy .env.example to .env.local and fill it in.'
+  );
+}
 
 // Global cached pool for server actions / API routes
 let pool: Pool;
