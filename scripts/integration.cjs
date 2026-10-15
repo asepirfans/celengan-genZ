@@ -19,6 +19,13 @@ const netWorth=data=>data.accounts.reduce((sum,a)=>sum+Number(a.initial_balance)
  for(const email of emails){const res=await request('/api/auth','POST',{action:'register',email,password,full_name:'Integration fixture'});assert.ok(/HttpOnly/i.test(res.headers.get('set-cookie')));assert.ok(/SameSite=strict/i.test(res.headers.get('set-cookie')));assert.equal(res.json.user.password,undefined);users.push({id:res.json.user.id,cookie:res.cookie,email});}
  for(const user of users)await pool.query('INSERT INTO email_inboxes(user_id,local_part,enabled) VALUES($1,$2,false)',[user.id,'fixture-'+randomUUID()]);
  const [a,b]=users;let dataA=(await request('/api/init','GET',undefined,a.cookie)).json.data;const dataB=(await request('/api/init','GET',undefined,b.cookie)).json.data;
+ // Setup guide must show confirmations for this user's current provider/address only.
+ const emailSetup=(await request('/api/email-integration','GET',undefined,a.cookie)).json.data;
+ const setupConfirmation=(await pool.query("INSERT INTO inbound_emails(user_id,provider_id,provider,recipient,sender,subject,received_at,suggested,status,created_at) VALUES($1,$2,$3,$4,'forwarding-noreply@google.com','Current setup',now(),'{}','ignored',now()-interval '3 minutes') RETURNING id",[a.id,randomUUID(),emailSetup.provider,emailSetup.address])).rows[0];
+ await pool.query("INSERT INTO inbound_emails(user_id,provider_id,provider,recipient,sender,subject,received_at,suggested,status) VALUES($1,$2,$3,$4,'forwarding-noreply@google.com','Wrong destination',now(),'{}','ignored'),($1,$5,$6,$7,'forwarding-noreply@google.com','Old provider',now(),'{}','ignored')",[a.id,randomUUID(),emailSetup.provider,'other@wrong.example.invalid',randomUUID(),emailSetup.provider==='cloudflare'?'resend':'cloudflare',emailSetup.address]);
+ assert.equal((await request('/api/email-integration','GET',undefined,a.cookie)).json.data.confirmation.id,setupConfirmation.id);checks++;
+ assert.equal((await request('/api/email-integration','GET',undefined,b.cookie)).json.data.confirmation,null);checks++;
+ await pool.query("DELETE FROM inbound_emails WHERE user_id=$1 AND sender='forwarding-noreply@google.com'",[a.id]);
  assert.equal(dataA.profile.password,undefined);const accountA=dataA.accounts[0].id,accountB=dataB.accounts[0].id;
  await request('/api/accounts','PUT',{id:accountA,initial_balance:1000000},a.cookie);await request('/api/accounts','PUT',{id:accountB,initial_balance:1000000},b.cookie);
  await request('/api/accounts','PUT',{id:accountB,name:'attack'},a.cookie,404);await request('/api/accounts?id='+accountB,'DELETE',undefined,a.cookie,404);
@@ -144,7 +151,7 @@ const netWorth=data=>data.accounts.reduce((sum,a)=>sum+Number(a.initial_balance)
  const firstPage=(await request('/api/email-integration?status=pending&page=0','GET',undefined,a.cookie)).json.data;assert.equal(firstPage.emails.length,50);assert.equal(firstPage.has_more,true);
  const nextPage=(await request('/api/email-integration?status=pending&page=1','GET',undefined,a.cookie)).json.data;assert.ok(nextPage.emails.length>0);assert.ok(!firstPage.emails.some(e=>nextPage.emails.some(next=>next.id===e.id)));
  await request('/api/email-integration?page=-1','GET',undefined,a.cookie,400);
- const confirmation=(await pool.query("INSERT INTO inbound_emails(user_id,provider_id,sender,subject,received_at) VALUES($1,$2,'forwarding-noreply@google.com','Gmail Forwarding Confirmation',now()) RETURNING id",[a.id,randomUUID()])).rows[0];
+ const confirmation=(await pool.query("INSERT INTO inbound_emails(user_id,provider_id,provider,recipient,sender,subject,received_at) VALUES($1,$2,$3,$4,'forwarding-noreply@google.com','Gmail Forwarding Confirmation',now()) RETURNING id",[a.id,randomUUID(),emailSetup.provider,emailSetup.address])).rows[0];
  await request('/api/email-integration','POST',{action:'verification',id:confirmation.id},b.cookie,404);
  assert.equal((await request('/api/email-integration?status=pending','GET',undefined,a.cookie)).json.data.confirmation.id,confirmation.id);
  await request('/api/auth','POST',{action:'login',email:a.email,password},'',200);

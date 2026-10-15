@@ -12,8 +12,9 @@ export async function GET(req:Request) {
   const params=new URL(req.url).searchParams,page=Number(params.get('page')||0),status=params.get('status')||'all';
   assert(Number.isInteger(page)&&page>=0&&page<=10000,'Halaman tidak valid.');assert(['all','pending','posted','ignored'].includes(status),'Status tidak valid.');
   const emails=await pool.query("SELECT * FROM inbound_emails WHERE user_id=$1 AND ($2='all' OR status=$2) AND sender<>'forwarding-noreply@google.com' ORDER BY created_at DESC,id DESC LIMIT 51 OFFSET $3",[user,status,page*50]);
-  const confirmation=(await pool.query("SELECT id,subject FROM inbound_emails WHERE user_id=$1 AND sender='forwarding-noreply@google.com' ORDER BY created_at DESC LIMIT 1",[user])).rows[0]||null;
   const {domain,provider,configured}=emailConfig();
+  const recipient=domain&&inbox.rows[0]?`${inbox.rows[0].local_part}@${domain}`:null;
+  const confirmation=(await pool.query("SELECT id,subject FROM inbound_emails WHERE user_id=$1 AND sender='forwarding-noreply@google.com' AND provider=$2 AND recipient=$3 ORDER BY created_at DESC LIMIT 1",[user,provider,recipient])).rows[0]||null;
   return ok({configured,provider,address:domain&&inbox.rows[0]?`${inbox.rows[0].local_part}@${domain}`:null,enabled:inbox.rows[0]?.enabled||false,forwarding_sender:inbox.rows[0]?.forwarding_sender||null,routes:routes.rows,emails:emails.rows.slice(0,50),has_more:emails.rows.length>50,page,confirmation});
  }catch(error){return failure(error);}
 }
