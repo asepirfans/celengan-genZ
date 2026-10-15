@@ -70,7 +70,16 @@ function event(recipient,text){const raw=Buffer.from('From: Bank <receipts@examp
   for(let i=0;i<8;i++){const id=createHash('sha256').update(randomUUID()).digest('hex');capIds.push(id);await pool.query('INSERT INTO cloudflare_email_payloads(id,user_id,recipient,raw_base64,received_at,processed_at) VALUES($1,$2,$3,$4,now(),now())',[id,a.id,recipient,'A'.repeat(1400000)]);}
   await deliver(event(recipient,text.replace('CF-FIXTURE-123456','CF-CAP-123456')),503);
  } finally {await pool.query('DELETE FROM cloudflare_email_payloads WHERE id=ANY($1::text[])',[capIds]);}
- console.log('PASS: '+checks+' Cloudflare ingress assertions; signatures, replay, ownership, paused inbox, MIME, atomic duplicates and confirmation.');
+ // BNI top-up must debit the mapped source, including fees, once across re-forwards.
+ await pool.query("INSERT INTO email_wallet_routes(user_id,sender,account_hint,account_id,auto_sync,auto_enabled_at) VALUES($1,'wondr@bni.co.id','*******667',$2,true,now()-interval '1 day')",[a.id,a.account]);
+ const topupText='From: <wondr@bni.co.id>\nTop-up berhasil!\nTerima kasih udah memilih wondr by BNI untuk transaksi kamu! Kamu baru aja top-up e-Wallet dengan detail sebagai berikut:\nPenerima\nDANA TEST\nDANA • 62*******1234\nSumber dana\nNAMA UJI\nTAPLUS • *******667\nTanggal 10 Oktober 2026\nWaktu 10:20:14 WIB\nNominal Rp75.000\nBiaya transaksi Rp0\nTotal Rp75.000\nRef ID CF-TOPUP-123456';
+ await pool.query("UPDATE email_inboxes SET forwarding_sender='receipts@example.invalid' WHERE user_id=$1",[a.id]);
+ await deliver(event(recipient,topupText));
+ const topupRow=(await pool.query("SELECT e.status,e.auto_posted,t.type,t.amount,t.account_id FROM inbound_emails e JOIN transactions t ON t.id=e.transaction_id WHERE e.user_id=$1 AND e.suggested->>'bank_reference'='CF-TOPUP-123456'",[a.id])).rows[0];
+ assert.equal(topupRow.status,'posted');assert.equal(topupRow.auto_posted,true);assert.equal(topupRow.type,'expense');assert.equal(Number(topupRow.amount),75000);assert.equal(topupRow.account_id,a.account);checks+=5;
+ await deliver(event(recipient,topupText+'\nNew forward wrapper'));
+ assert.equal((await pool.query("SELECT count(DISTINCT transaction_id) FROM inbound_emails WHERE user_id=$1 AND suggested->>'bank_reference'='CF-TOPUP-123456'",[a.id])).rows[0].count,'1');checks++;
+ console.log('PASS: '+checks+' Cloudflare ingress assertions; signatures, replay, ownership, paused inbox, MIME, atomic duplicates, confirmation and BNI top-up.');
 }finally{
  const ids=users.map(user=>typeof user==='string'?user:user.id);
  if(ids.length){await pool.query('DELETE FROM email_transaction_keys WHERE user_id=ANY($1::uuid[])',[ids]);for(const table of ['inbound_emails','email_wallet_routes','email_inboxes','transactions','categories','accounts'])await pool.query('DELETE FROM '+table+' WHERE user_id=ANY($1::uuid[])',[ids]);await pool.query('DELETE FROM profiles WHERE id=ANY($1::uuid[])',[ids]);console.log('Cloudflare fixtures removed.');}

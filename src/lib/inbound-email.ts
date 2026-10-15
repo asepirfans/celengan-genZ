@@ -25,9 +25,10 @@ function bniSuggestion(content:string):EmailSuggestion|null {
  const transfer=/\bTransfer berhasil\b/i.test(plain);
  const virtualAccount=/\bTransaksi berhasil\b/i.test(plain)&&/melakukan pembayaran pakai Virtual Account/i.test(plain);
  const qris=/\bTransaksi berhasil\b/i.test(plain)&&/(?:bayar|pembayaran)\s+(?:pakai\s+)?QRIS|Jenis transaksi\s*:?\s*QRIS/i.test(plain);
- if(!/wondr by BNI/i.test(plain)||(!transfer&&!virtualAccount&&!qris)||!/Sumber dana/i.test(plain))return null;
+ const topup=/\btop[- ]?up berhasil\b/i.test(plain)&&/baru aja\s+top[- ]?up\s+e[- ]?wallet/i.test(plain);
+ if(!/wondr by BNI/i.test(plain)||(!transfer&&!virtualAccount&&!qris&&!topup)||!/Sumber dana/i.test(plain))return null;
  const labelled=(label:string)=>[...plain.matchAll(new RegExp('(?:'+label+')\\s*:?\\s*Rp\\.?\\s*([\\d.,]+)','gi'))].map(m=>idr(m[1]));
- const values=labelled('Nominal'),fees=labelled('Biaya admin'),totals=labelled('Total');
+ const values=labelled('Nominal'),fees=labelled('Biaya admin|Biaya transaksi'),totals=labelled('Total');
  const unique=[...new Set(values)]; const principal=unique.length===1?unique[0]:undefined;
  const total=totals.length===1?totals[0]:undefined;
  const fee=fees.length===1?fees[0]:qris&&fees.length===0&&principal===total?0:undefined;
@@ -35,13 +36,13 @@ function bniSuggestion(content:string):EmailSuggestion|null {
  const date=labelledDate(plain);
  const source=plain.match(/Sumber dana\s+.*?([*xX]{2,}\d{2,6})(?=\s|$)/i)?.[1].toLowerCase();
  const original=content.match(/^\s*From:\s*(.+)$/mi)?.[1];const sender=original?mailbox(original.trim()):null;
- const references=[...new Set([...plain.matchAll(/Reference ID\s*:?\s*([A-Za-z0-9-]{6,100})\b/gi)].map(m=>m[1]))];
+ const references=[...new Set([...plain.matchAll(/(?:Reference|Ref) ID\s*:?\s*([A-Za-z0-9-]{6,100})\b/gi)].map(m=>m[1]))];
  const reference=references.length===1?references[0]:undefined;
  const lines=content.split(/\r?\n/).map(line=>line.trim().replace(/^\*\s*|\s*\*$/g,'')).filter(Boolean);
  const recipientIndex=transfer?lines.findIndex(line=>line.toLowerCase()==='penerima'):-1;
  const recipient=recipientIndex>=0?lines[recipientIndex+1]:undefined;
  const recipientHash=recipient?createHash('sha256').update(recipient.trim().replace(/\s+/g,' ').toLowerCase()).digest('hex'):undefined;
- return {amount,type:'expense',account_hint:source,date,source_sender:sender||undefined,bank_reference:reference,principal_amount:principal,fee_amount:fee,recipient_name_hash:recipientHash,reason:amount&&date&&source&&reference?(qris?'Pembayaran QRIS BNI terbaca.':virtualAccount?'Pembayaran Virtual Account BNI terbaca. Total termasuk biaya admin.':'Transfer keluar BNI terbaca. Periksa jika rekening tujuan milik sendiri.'):'Detail email belum lengkap atau mengandung beberapa transaksi. Periksa sebelum mencatat.'};
+ return {amount,type:'expense',account_hint:source,date,source_sender:sender||undefined,bank_reference:reference,principal_amount:principal,fee_amount:fee,recipient_name_hash:recipientHash,reason:amount&&date&&source&&reference?(topup?'Top-up e-wallet dari BNI terbaca sebagai uang keluar dari rekening sumber.':qris?'Pembayaran QRIS BNI terbaca.':virtualAccount?'Pembayaran Virtual Account BNI terbaca. Total termasuk biaya admin.':'Transfer keluar BNI terbaca. Periksa jika rekening tujuan milik sendiri.'):'Detail email belum lengkap atau mengandung beberapa transaksi. Periksa sebelum mencatat.'};
 }
 function labelledMoney(content:string,label:string):number|undefined {
  const values=[...content.matchAll(new RegExp('\\b(?:'+label+')\\s*[:=]?\\s*(?:Rp\\.?|IDR)\\s*([\\d.,]+)','gi'))].filter(m=>!/(?:tip|fee|biaya|admin|tax|pajak|diskon|discount|cashback)\s*$/i.test(content.slice(Math.max(0,m.index!-30),m.index))).map(m=>idr(m[1].replace(/[.,]$/,'')));
@@ -110,7 +111,8 @@ export function suggestEmail(subject: string, body: string): EmailSuggestion {
  const plain=content.replace(/\*{1,2}([A-Za-z][^*\n]*?)\*{1,2}/g,'$1').replace(/\s+/g,' ');
  const principal=labelledMoney(plain,'nominal(?: transaksi| pembayaran| transfer)?|jumlah transaksi|transaction amount|amount|jumlah diterima|jumlah|nilai transaksi|payment amount|paid amount|jumlah pembayaran|jumlah transfer');
  const total=labelledMoney(plain,'total(?: pembayaran| transaksi| dibayar| payment| amount)?|jumlah pembayaran|jumlah dibayar|total paid|you paid');
- const income = /dana masuk|transfer masuk|pemasukan|credited|incoming transfer|(?:menerima|received)\s+(?:transfer|dana|uang|payment)|(?:top.?up|isi saldo)\s+(?:berhasil|sukses)/i.test(plain);
+ // Top-up success alone does not establish which wallet gained or lost money.
+ const income = /dana masuk|transfer masuk|pemasukan|credited|incoming transfer|(?:menerima|received)\s+(?:transfer|dana|uang|payment)/i.test(plain);
  const expense = /dana keluar|transfer keluar|pengeluaran|(?:pembayaran|bayar|payment)\s+(?:berhasil|sukses|successful)|debited|(?:bayar|membayar|melakukan pembayaran)\s+(?:pakai|dengan|menggunakan)|pembayaran\s+(?:QRIS|Virtual Account)/i.test(plain);
  const type = income!==expense ? income?'income':'expense' : undefined;
  const received=labelledMoney(plain,'jumlah diterima|dana diterima|saldo diterima|received amount|amount received');
