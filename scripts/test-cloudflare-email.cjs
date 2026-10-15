@@ -35,11 +35,12 @@ function event(recipient,text){const raw=Buffer.from('From: Bank <receipts@examp
   const body=JSON.stringify({type:'email.received',data:{email_id:randomUUID()}}),eventId='msg_'+randomUUID(),time=new Date();
   const response=await require('../src/app/api/webhooks/email/route.ts').POST(new Request('https://app.example.invalid/api/webhooks/email',{method:'POST',body,headers:{'svix-id':eventId,'svix-timestamp':String(Math.floor(time.getTime()/1000)),'svix-signature':new Webhook(resendSecret).sign(eventId,time,body)}}));
   assert.equal(response.status,200,await response.clone().text());assert.equal((await pool.query('SELECT count(*) FROM transactions WHERE user_id=$1',[b.id])).rows[0].count,'1');checks+=2;
-  process.env.CLOUDFLARE_EMAIL_WORKER_URL='https://worker.example.invalid';
-  const stored=event(recipient,text),item={provider:'cloudflare',provider_id:'cf:'+stored.id,recipient,local_part:a.local};
-  global.fetch=async()=>new Response(JSON.stringify(stored),{status:200});assert.equal((await originalEmail(item)).from.address,'receipts@example.invalid');checks++;
+  const stored=event(recipient,text),item={provider:'cloudflare',provider_id:'cf:'+stored.id,recipient,local_part:a.local,user_id:a.id};
+  assert.equal((await originalEmail(item)).from.address,'receipts@example.invalid');checks++;
   await assert.rejects(()=>originalEmail({...item,recipient:'wrong@example.invalid'}),error=>error.status===403);checks++;
-  global.fetch=async()=>new Response('Expired',{status:404});await assert.rejects(()=>originalEmail(item),error=>error.status===410);checks++;
+  await assert.rejects(()=>originalEmail({...item,user_id:b.id}),error=>error.status===410);checks++;
+  await pool.query("UPDATE cloudflare_email_payloads SET expires_at=now()-interval '1 minute' WHERE id=$1",[stored.id]);
+  await assert.rejects(()=>originalEmail(item),error=>error.status===410);checks++;
  }finally{global.fetch=originalFetch;}
  await pool.query('UPDATE email_inboxes SET enabled=false WHERE user_id=$1',[a.id]);await deliver(event(recipient,text.replace('123456','999999')));assert.equal((await pool.query('SELECT count(*) FROM transactions WHERE user_id=$1',[a.id])).rows[0].count,'1');checks++;
  await deliver(event('wallet-'+randomBytes(24).toString('hex')+'@'+process.env.CLOUDFLARE_EMAIL_DOMAIN,text));
@@ -47,6 +48,28 @@ function event(recipient,text){const raw=Buffer.from('From: Bank <receipts@examp
  const confirmation=event(b.local+'@'+process.env.CLOUDFLARE_EMAIL_DOMAIN,'Confirmation code: 123456789\nhttps://mail-settings.google.com/mail/vf-fixture');
  const bytes=Buffer.from(confirmation.raw,'base64').toString().replace('Bank <receipts@example.invalid>','Gmail <forwarding-noreply@google.com>');const confirmed=event(confirmation.recipient,'unused');confirmed.raw=Buffer.from(bytes).toString('base64');confirmed.id=createHash('sha256').update(confirmed.recipient+'\0').update(Buffer.from(confirmed.raw,'base64')).digest('hex');await deliver(confirmed);
  const verification=(await pool.query("SELECT verification,status FROM inbound_emails WHERE user_id=$1 AND sender='forwarding-noreply@google.com'",[b.id])).rows[0];assert.equal(verification.status,'ignored');assert.equal(verification.verification.code,'123456789');checks+=2;
+ // A processing failure must retain a committed payload; signed retry recovers it once.
+ await pool.query('UPDATE email_inboxes SET enabled=true WHERE user_id=$1',[a.id]);
+ const retryValue=event(recipient,text.replace('CF-FIXTURE-123456','CF-RETRY-654321'));
+ const syncModule=require('../src/lib/server/email-sync.ts'),realSync=syncModule.syncEmail;
+ try {syncModule.syncEmail=async()=>{throw new Error('fixture-processing-failure');};const result=await deliver(retryValue);assert.equal(result.data.queued,true);checks++;} finally {syncModule.syncEmail=realSync;}
+ const pending=(await pool.query('SELECT * FROM cloudflare_email_payloads WHERE id=$1',[retryValue.id])).rows[0];assert.ok(pending);assert.equal(pending.processed_at,null);assert.equal(pending.attempts,1);checks+=3;
+ assert.equal((await pool.query('SELECT count(*) FROM inbound_emails WHERE user_id=$1 AND provider_id=$2',[a.id,'cf:'+retryValue.id])).rows[0].count,'0');checks++;
+ await pool.query('UPDATE cloudflare_email_payloads SET next_attempt_at=now() WHERE id=$1',[retryValue.id]);
+ await deliver({action:'retry'},401,{invalid:true});await deliver({action:'retry'});
+ assert.ok((await pool.query('SELECT processed_at FROM cloudflare_email_payloads WHERE id=$1',[retryValue.id])).rows[0].processed_at);checks++;
+ assert.equal((await pool.query('SELECT count(*) FROM transactions WHERE user_id=$1',[a.id])).rows[0].count,'2');checks++;
+ await deliver(retryValue);assert.equal((await pool.query('SELECT count(*) FROM transactions WHERE user_id=$1',[a.id])).rows[0].count,'2');checks++;
+ // Expired raw mail is unavailable immediately and removed by cron.
+ await pool.query("UPDATE cloudflare_email_payloads SET expires_at=now()-interval '1 minute' WHERE id=$1",[retryValue.id]);await deliver({action:'retry'});
+ assert.equal((await pool.query('SELECT count(*) FROM cloudflare_email_payloads WHERE id=$1',[retryValue.id])).rows[0].count,'0');checks++;
+ assert.equal((await pool.query("SELECT relrowsecurity FROM pg_class WHERE oid='cloudflare_email_payloads'::regclass")).rows[0].relrowsecurity,true);checks++;
+ assert.equal((await pool.query("SELECT has_table_privilege('anon','cloudflare_email_payloads','SELECT') AS allowed")).rows[0].allowed,false);checks++;
+ // Storage admission refuses new mail rather than acknowledging a full user's buffer.
+ const capIds=[];try {
+  for(let i=0;i<8;i++){const id=createHash('sha256').update(randomUUID()).digest('hex');capIds.push(id);await pool.query('INSERT INTO cloudflare_email_payloads(id,user_id,recipient,raw_base64,received_at,processed_at) VALUES($1,$2,$3,$4,now(),now())',[id,a.id,recipient,'A'.repeat(1400000)]);}
+  await deliver(event(recipient,text.replace('CF-FIXTURE-123456','CF-CAP-123456')),503);
+ } finally {await pool.query('DELETE FROM cloudflare_email_payloads WHERE id=ANY($1::text[])',[capIds]);}
  console.log('PASS: '+checks+' Cloudflare ingress assertions; signatures, replay, ownership, paused inbox, MIME, atomic duplicates and confirmation.');
 }finally{
  const ids=users.map(user=>typeof user==='string'?user:user.id);

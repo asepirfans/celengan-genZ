@@ -1,33 +1,53 @@
-const {test}=require('node:test'),assert=require('node:assert/strict'),{createHmac}=require('node:crypto');
-class Bucket {
- constructor(){this.items=new Map();}
- async put(key,value){this.items.set(key,value);}
- async delete(key){this.items.delete(key);}
- async get(key){const value=this.items.get(key);return value===undefined?null:{text:async()=>value,json:async()=>JSON.parse(value)};}
- async list({prefix,limit}){return {objects:[...this.items.keys()].filter(k=>k.startsWith(prefix)).slice(0,limit).map(key=>({key})),truncated:false};}
-}
-const secret='unit-test-only-secret-12345678901234567890';
-test('Cloudflare Worker buffers before delivery, signs requests, retries and protects archive reads',async()=>{
- const worker=(await import('../cloudflare/email-worker/worker.mjs')).default;
- const bucket=new Bucket(),env={EMAIL_SECRET:secret,EMAIL_DOMAIN:'inbound.example.invalid',WEBHOOK_URL:'https://app.example.invalid/api/webhooks/cloudflare-email',EMAIL_BUFFER:bucket};
- const to='wallet-'+'a'.repeat(48)+'@inbound.example.invalid',raw='From: bank@example.invalid\r\nSubject: Payment\r\n\r\nAmount Rp 100';
- const message=()=>({to,rawSize:Buffer.byteLength(raw),raw:new Response(raw).body,setReject:()=>assert.fail('Valid message rejected')});
- const original=global.fetch;let attempts=0,id;
- try{
-  global.fetch=async(_url,options)=>{attempts++;const expected=createHmac('sha256',secret).update(options.headers['x-email-timestamp']+'.'+options.body).digest('hex');assert.equal(options.headers['x-email-signature'],expected);const payload=JSON.parse(options.body);id=payload.id;assert.ok(bucket.items.has('pending/'+id+'.json'));return new Response('down',{status:503});};
-  await worker.email(message(),env);assert.equal(attempts,1);assert.ok(bucket.items.has('pending/'+id+'.json'));
-  global.fetch=async()=>new Response(JSON.stringify({success:true,data:{received:true}}),{status:200});
-  await worker.scheduled({},env);assert.ok(!bucket.items.has('pending/'+id+'.json'));assert.ok(bucket.items.has('archive/'+id+'.json'));
-  assert.equal((await worker.fetch(new Request('https://worker.example/read',{method:'POST',body:JSON.stringify({id})}),env)).status,401);
-  const body=JSON.stringify({id}),timestamp=String(Math.floor(Date.now()/1000));
-  const response=await worker.fetch(new Request('https://worker.example/read',{method:'POST',body,headers:{'x-email-timestamp':timestamp,'x-email-signature':createHmac('sha256',secret).update(timestamp+'.'+body).digest('hex')}}),env);
-  assert.equal(response.status,200);assert.equal(Buffer.from((await response.json()).raw,'base64').toString(),raw);
-  assert.equal((await worker.fetch(new Request('https://worker.example/'),env)).status,404);
-  let rejected=false;await worker.email({...message(),to:'support@inbound.example.invalid',setReject:()=>{rejected=true;}},env);assert.ok(rejected);
-  rejected=false;await worker.email({...message(),rawSize:1048577,setReject:()=>{rejected=true;}},env);assert.ok(rejected);
- }finally{global.fetch=original;}
+const { test } = require('node:test'), assert = require('node:assert/strict'), { createHmac, createHash } = require('node:crypto');
+const secret = 'unit-test-only-secret-12345678901234567890';
+const env = { EMAIL_SECRET: secret, EMAIL_DOMAIN: 'inbound.example.invalid', WEBHOOK_URL: 'https://app.example.invalid/api/webhooks/cloudflare-email' };
+const to = 'wallet-' + 'a'.repeat(48) + '@inbound.example.invalid';
+const raw = 'From: bank@example.invalid\r\nSubject: Payment\r\n\r\nAmount Rp 100';
+const message = () => ({ to, rawSize: Buffer.byteLength(raw), raw: new Response(raw).body, setReject: () => assert.fail('Valid message rejected') });
+function checkSignature(options) { assert.equal(options.headers['x-email-signature'], createHmac('sha256', secret).update(options.headers['x-email-timestamp'] + '.' + options.body).digest('hex')); }
+
+test('Worker sends stable identity and signed MIME without R2; queued database acknowledgement is accepted', async () => {
+  const worker = (await import('../cloudflare/email-worker/worker.mjs')).default, original = global.fetch;
+  try {
+    let deliveries = 0;
+    global.fetch = async (url, options) => {
+      assert.equal(url.href, env.WEBHOOK_URL); checkSignature(options);
+      const payload = JSON.parse(options.body);
+      assert.equal(payload.id, createHash('sha256').update(to + '\0').update(raw).digest('hex'));
+      assert.equal(Buffer.from(payload.raw, 'base64').toString(), raw);
+      deliveries++;
+      return new Response(JSON.stringify({ success: true, data: { received: true, queued: true } }));
+    };
+    await worker.email(message(), env); await worker.email(message(), env); assert.equal(deliveries, 2);
+  } finally { global.fetch = original; }
 });
-test('Worker does not discard a message on an unrelated 2xx response',async()=>{
- const worker=(await import('../cloudflare/email-worker/worker.mjs')).default,bucket=new Bucket(),original=global.fetch;
- try{global.fetch=async()=>new Response('{}',{status:200});await worker.email({to:'wallet-'+'b'.repeat(48)+'@inbound.example.invalid',rawSize:1,raw:new Response('x').body,setReject:()=>assert.fail()}, {EMAIL_DOMAIN:'inbound.example.invalid',EMAIL_SECRET:secret,WEBHOOK_URL:'https://app.example.invalid/api/webhooks/cloudflare-email',EMAIL_BUFFER:bucket});assert.equal([...bucket.items.keys()].filter(k=>k.startsWith('pending/')).length,1);}finally{global.fetch=original;}
+
+test('Worker propagates failures and unrelated 2xx responses instead of losing email silently', async () => {
+  const worker = (await import('../cloudflare/email-worker/worker.mjs')).default, original = global.fetch;
+  try {
+    for (const response of [new Response('down', { status: 503 }), new Response('{}'), new Response(JSON.stringify({ success: true, data: { retried: true } }))]) {
+      global.fetch = async () => response;
+      await assert.rejects(() => worker.email(message(), env), /not acknowledged/);
+    }
+    global.fetch = async () => { throw new Error('Offline'); };
+    await assert.rejects(() => worker.email(message(), env), /Offline/);
+    await assert.rejects(() => worker.email(message(), { ...env, WEBHOOK_URL: 'http://example.invalid/api/webhooks/cloudflare-email' }), /URL invalid/);
+  } finally { global.fetch = original; }
+});
+
+test('Scheduled retry is signed, requires database acknowledgement, and exposes no archive endpoint', async () => {
+  const worker = (await import('../cloudflare/email-worker/worker.mjs')).default, original = global.fetch;
+  try {
+    global.fetch = async (_url, options) => { checkSignature(options); assert.deepEqual(JSON.parse(options.body), { action: 'retry' }); return new Response(JSON.stringify({ success: true, data: { retried: true } })); };
+    await worker.scheduled({}, env);
+    global.fetch = async () => new Response('{}');
+    await assert.rejects(() => worker.scheduled({}, env), /not acknowledged/);
+    assert.equal((await worker.fetch(new Request('https://worker.example/read'))).status, 404);
+    let rejected = false;
+    await worker.email({ ...message(), to: 'support@inbound.example.invalid', setReject: () => { rejected = true; } }, env); assert.ok(rejected);
+    rejected = false;
+    await worker.email({ ...message(), rawSize: 1048577, setReject: () => { rejected = true; } }, env); assert.ok(rejected);
+    rejected = false;
+    await worker.email({ ...message(), raw: new Response('x'.repeat(1048577)).body, setReject: () => { rejected = true; } }, env); assert.ok(rejected);
+  } finally { global.fetch = original; }
 });

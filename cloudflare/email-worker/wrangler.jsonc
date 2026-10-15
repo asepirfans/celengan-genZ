@@ -3,12 +3,11 @@
   "name": "celengan-email-ingress",
   "main": "worker.mjs",
   "compatibility_date": "2026-10-15",
-  "workers_dev": true,
+  "workers_dev": false,
   "vars": {
-    "EMAIL_DOMAIN": "masuk.example.com",
-    "WEBHOOK_URL": "https://YOUR_APP.vercel.app/api/webhooks/cloudflare-email"
+    "EMAIL_DOMAIN": "cloudiolabs.my.id",
+    "WEBHOOK_URL": "https://celengan-gen-z.vercel.app/api/webhooks/cloudflare-email"
   },
-  "r2_buckets": [{ "binding": "EMAIL_BUFFER", "bucket_name": "celengan-email-buffer" }],
   "triggers": { "crons": ["*/5 * * * *"] },
   "observability": { "enabled": false }
 }

@@ -28,7 +28,7 @@ export async function POST(req:Request) {
    await client.query('UPDATE email_inboxes SET forwarding_sender=$1 WHERE user_id=$2',[sender,user]);return {sender};
   }));
   if(body.action==='reparse') {
-   const item=(await pool.query('SELECT e.provider_id,e.provider,e.recipient,e.status,i.local_part FROM inbound_emails e JOIN email_inboxes i ON i.user_id=e.user_id WHERE e.id=$1 AND e.user_id=$2',[id(body.id),user])).rows[0];assert(item,'Email tidak ditemukan.',404);assert(item.status==='pending','Email sudah diproses.',409);
+   const item=(await pool.query('SELECT e.user_id,e.provider_id,e.provider,e.recipient,e.status,i.local_part FROM inbound_emails e JOIN email_inboxes i ON i.user_id=e.user_id WHERE e.id=$1 AND e.user_id=$2',[id(body.id),user])).rows[0];assert(item,'Email tidak ditemukan.',404);assert(item.status==='pending','Email sudah diproses.',409);
    const email=await originalEmail(item);
    const suggestion=suggestEmail(String(email.subject||''),receivedEmailText(email));
    const updated=await pool.query("UPDATE inbound_emails SET suggested=$1,sync_reason=NULL WHERE id=$2 AND user_id=$3 AND status='pending' RETURNING id",[JSON.stringify(suggestion),body.id,user]);assert(updated.rows[0],'Email sudah diproses.',409);return ok(suggestion);

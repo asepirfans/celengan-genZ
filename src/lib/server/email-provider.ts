@@ -2,6 +2,7 @@ import PostalMime from 'postal-mime';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { assert } from './api';
 import { mailbox } from '@/lib/inbound-email';
+import pool from '@/lib/db';
 
 export function emailConfig() {
  const provider=process.env.INBOUND_EMAIL_PROVIDER||'resend';
@@ -26,14 +27,12 @@ export async function parseCloudflareRaw(raw:unknown) {
  const bytes=Buffer.from(raw,'base64');assert(bytes.length>0&&bytes.length<=1048576&&bytes.toString('base64')===raw,'Ukuran atau encoding email tidak valid.');
  return PostalMime.parse(bytes,{maxNestingDepth:30,maxPartCount:100,maxHeadersSize:32768});
 }
-export async function originalEmail(item:{provider:string;provider_id:string;recipient?:string|null;local_part:string}) {
+export async function originalEmail(item:{provider:string;provider_id:string;recipient?:string|null;local_part:string;user_id?:string}) {
  if(item.provider==='cloudflare'){
-  const secret=process.env.CLOUDFLARE_EMAIL_SECRET,url=process.env.CLOUDFLARE_EMAIL_WORKER_URL;assert(secret&&url,'Penyimpanan email Cloudflare belum dikonfigurasi.',503);
-  const target=new URL('/read',url);assert(target.protocol==='https:'&&!target.username&&!target.password,'URL Worker tidak valid.',503);
-  const body=JSON.stringify({id:item.provider_id.replace(/^cf:/,'')}),timestamp=String(Math.floor(Date.now()/1000));
-  const response=await fetch(target,{method:'POST',redirect:'error',headers:{'Content-Type':'application/json','x-email-timestamp':timestamp,'x-email-signature':signCloudflare(body,timestamp,secret)},body,cache:'no-store',signal:AbortSignal.timeout(15000)});
-  assert(response.ok,response.status===404?'Salinan email sudah kedaluwarsa. Periksa email asli di Gmail.':'Salinan email belum dapat dibaca.',response.status===404?410:503);
-  const data=await response.json();assert(data.recipient===item.recipient,'Tujuan email tidak cocok.',403);return parseCloudflareRaw(data.raw);
+  assert(item.user_id,'Pemilik email tidak tersedia.',403);
+  const data=(await pool.query('SELECT recipient,raw_base64 FROM cloudflare_email_payloads WHERE id=$1 AND user_id=$2 AND expires_at>now()',[item.provider_id.replace(/^cf:/,''),item.user_id])).rows[0];
+  assert(data,'Salinan email sudah kedaluwarsa. Periksa email asli di Gmail.',410);
+  assert(data.recipient===item.recipient,'Tujuan email tidak cocok.',403);return parseCloudflareRaw(data.raw_base64);
  }
  const response=await fetch('https://api.resend.com/emails/receiving/'+encodeURIComponent(item.provider_id),{headers:{Authorization:'Bearer '+process.env.RESEND_API_KEY},cache:'no-store',signal:AbortSignal.timeout(10000)});
  assert(response.ok,'Email asli belum dapat diambil. Coba lagi nanti.',503);const email=await response.json();

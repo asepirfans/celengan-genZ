@@ -81,4 +81,4 @@ Pembacaan nominal membersihkan tautan gambar/pelacakan, spasi khusus, dan karakt
 
 ### Penerimaan Cloudflare (migrasi dari Resend)
 
-Dukungan Cloudflare Email Worker tersedia di `cloudflare/email-worker`. Panduan domain, R2 privat, secret, environment Vercel, transisi Gmail, retensi dan pengujian ada di [docs/cloudflare-email-setup.md](docs/cloudflare-email-setup.md). Provider aktif tidak diganti otomatis sebelum domain/Worker siap.
+Dukungan Cloudflare Email Worker tersedia di `cloudflare/email-worker`. Penyimpanan email memakai PostgreSQL Supabase tanpa R2. Panduan domain, secret, environment Vercel, transisi Gmail, retensi dan pengujian ada di [docs/cloudflare-email-setup.md](docs/cloudflare-email-setup.md). Provider aktif tidak diganti otomatis sebelum domain/Worker siap.
