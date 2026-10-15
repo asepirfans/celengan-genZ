@@ -42,3 +42,5 @@ yarn-error.log*
 next-env.d.ts
 
 PRD_MoneyTracker.md
+# Temporary workspace npm cache
+.npm-task-cache/

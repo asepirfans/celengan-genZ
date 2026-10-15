@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { ChickenLogo } from '@/components/ui/ChickenLogo';
 import { Transaction, Profile, Category, Account } from '@/lib/types';
 import { formatCurrency, formatDate, formatTime } from '@/lib/formatters';
 
@@ -54,7 +55,7 @@ export function BookingStyleStatement({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-[#0284C7] text-white flex items-center justify-center text-2xl font-black shadow-sm">
-              💸
+              <ChickenLogo className="w-6 h-6" />
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight text-neutral-900">

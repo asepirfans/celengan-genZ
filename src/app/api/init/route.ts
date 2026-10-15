@@ -1,75 +1,24 @@
-import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
-
+import { requireUser, PROFILE_COLUMNS } from '@/lib/server/auth';
+import { failure, ok } from '@/lib/server/api';
 export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-
-    let profile = null;
-
-    if (userId) {
-      const profileRes = await pool.query('SELECT * FROM profiles WHERE id = $1', [userId]);
-      profile = profileRes.rows[0];
+    try {
+        const user = await requireUser(req);
+        const [p, a, c, t, b, e, g] = await Promise.all([
+            pool.query('SELECT ' + PROFILE_COLUMNS + ' FROM profiles WHERE id=$1', [user]),
+            pool.query('SELECT * FROM accounts WHERE user_id=$1 ORDER BY created_at', [user]),
+            pool.query('SELECT * FROM categories WHERE user_id=$1 OR user_id IS NULL ORDER BY name', [user]),
+            pool.query('SELECT * FROM transactions WHERE user_id=$1 ORDER BY date DESC', [user]),
+            pool.query('SELECT * FROM budgets WHERE user_id=$1', [user]),
+            pool.query('SELECT * FROM emergency_funds WHERE user_id=$1', [user]),
+            pool.query('SELECT w.account_id FROM goal_wallets w JOIN savings_goals g ON g.id=w.goal_id WHERE g.user_id=$1', [user])
+        ]);
+        const goalIds = new Set(g.rows.map(row => row.account_id));
+        const defaultIds = a.rows.filter(row => !row.is_archived && !goalIds.has(row.id) && (row.type === 'savings' || /darurat|emergency/i.test(row.name))).map(row => row.id);
+        const emergencyFund = e.rows[0] || { profile_type: 'single', monthly_expense: 3000000, target_months: 3, selected_account_ids: defaultIds };
+        return ok({ profile: p.rows[0], accounts: a.rows, categories: c.rows, transactions: t.rows, budgets: b.rows, emergencyFund, goalAccountIds: [...goalIds] });
     }
-
-    if (!profile) {
-      const firstProf = await pool.query('SELECT * FROM profiles ORDER BY created_at ASC LIMIT 1');
-      profile = firstProf.rows[0];
+    catch (error) {
+        return failure(error);
     }
-
-    if (!profile) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          profile: null,
-          accounts: [],
-          categories: [],
-          transactions: [],
-          budgets: []
-        }
-      });
-    }
-
-    // 2. Fetch Accounts for this user (Auto-seed starter template accounts if empty)
-    let accountsRes = await pool.query('SELECT * FROM accounts WHERE user_id = $1 ORDER BY created_at ASC', [profile.id]);
-    
-    if (accountsRes.rows.length === 0) {
-      await pool.query(`
-        INSERT INTO accounts (user_id, name, type, icon, color, initial_balance) VALUES
-        ($1, 'Rekening Bank (BCA/Mandiri)', 'bank', 'landmark', '#00529C', 0),
-        ($1, 'E-Wallet (GoPay/OVO/ShopeePay)', 'ewallet', 'smartphone', '#00AED6', 0),
-        ($1, 'Dompet Tunai (Cash)', 'cash', 'banknote', '#38BDF8', 0),
-        ($1, 'Dana Darurat (Vault)', 'bank', 'shield-check', '#3EFF9A', 0)
-      `, [profile.id]);
-
-      accountsRes = await pool.query('SELECT * FROM accounts WHERE user_id = $1 ORDER BY created_at ASC', [profile.id]);
-    }
-    
-    // 3. Fetch Categories (Isolate per user: default templates + this user custom categories)
-    let categoriesRes = await pool.query(
-      'SELECT * FROM categories WHERE user_id IS NULL OR user_id = $1 ORDER BY id ASC',
-      [profile.id]
-    );
-
-    // 4. Fetch Transactions for this user
-    let trxRes = await pool.query('SELECT * FROM transactions WHERE user_id = $1 ORDER BY date DESC', [profile.id]);
-
-    // 5. Fetch Budgets for this user
-    const budgetRes = await pool.query('SELECT * FROM budgets WHERE user_id = $1 ORDER BY created_at DESC', [profile.id]);
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        profile,
-        accounts: accountsRes.rows,
-        categories: categoriesRes.rows,
-        transactions: trxRes.rows,
-        budgets: budgetRes.rows
-      }
-    });
-  } catch (error: any) {
-    console.error('API /api/init error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
 }

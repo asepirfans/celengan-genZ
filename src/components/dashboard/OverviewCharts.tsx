@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, Legend 
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { useApp } from '@/lib/store';
 import { formatCurrency } from '@/lib/formatters';
@@ -72,78 +72,78 @@ export function OverviewCharts() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* 6-Month Income vs Expense Bar Chart */}
-      <div className="p-5 rounded-2xl bg-[#161616] border border-[#262626] lg:col-span-2 flex flex-col justify-between">
-        <div className="flex items-center justify-between mb-4">
+      <div className="p-5 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-subtle)] lg:col-span-2 flex flex-col justify-between">
+        <div className="chart-heading flex items-center justify-between gap-3 mb-4">
           <div>
-            <h3 className="font-display font-bold text-base text-white">
+            <h3 className="font-display font-bold text-base text-[var(--text-primary)]">
               Arus Kas Bulanan (6 Bulan Terakhir)
             </h3>
-            <p className="text-xs text-neutral-400">
+            <p className="text-xs text-[var(--text-secondary)]">
               Perbandingan pemasukan vs pengeluaran
             </p>
           </div>
 
           <div className="flex items-center gap-3 text-xs font-mono">
-            <span className="flex items-center gap-1.5 text-[#3EFF9A]">
-              <span className="w-2.5 h-2.5 rounded-sm bg-[#3EFF9A]" />
+            <span className="flex items-center gap-1.5 text-[var(--accent-success)]">
+              <span className="w-2.5 h-2.5 rounded-sm bg-[var(--accent-success)]" />
               Pemasukan
             </span>
-            <span className="flex items-center gap-1.5 text-[#FF4E4E]">
-              <span className="w-2.5 h-2.5 rounded-sm bg-[#FF4E4E]" />
+            <span className="flex items-center gap-1.5 text-[var(--accent-danger)]">
+              <span className="w-2.5 h-2.5 rounded-sm bg-[var(--accent-danger)]" />
               Pengeluaran
             </span>
           </div>
         </div>
 
-        <div className="h-64 w-full">
+        <div className="h-64 w-full min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <XAxis 
-                dataKey="name" 
-                stroke="#666" 
-                fontSize={11} 
-                tickLine={false}
-                axisLine={{ stroke: '#222' }} 
-              />
-              <YAxis 
-                stroke="#666" 
-                fontSize={10} 
+              <XAxis
+                dataKey="name"
+                stroke="#666"
+                fontSize={11}
                 tickLine={false}
                 axisLine={{ stroke: '#222' }}
-                tickFormatter={(val) => `${val >= 1000000 ? `${(val/1000000).toFixed(0)}jt` : val}`} 
               />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#1C1C1C', 
-                  border: '1px solid #333', 
+              <YAxis
+                stroke="#666"
+                fontSize={10}
+                tickLine={false}
+                axisLine={{ stroke: '#222' }}
+                tickFormatter={(val) => `${val >= 1000000 ? `${(val/1000000).toFixed(0)}jt` : val}`}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'var(--surface-card)',
+                  border: '1px solid var(--border-subtle)',
                   borderRadius: '12px',
-                  color: '#fff',
+                  color: 'var(--text-primary)',
                   fontSize: '12px',
                   fontFamily: 'monospace'
                 }}
                 formatter={(value: any) => formatCurrency(Number(value), currency, false, exchangeRates)}
               />
-              <Bar dataKey="Income" fill="#3EFF9A" radius={[4, 4, 0, 0]} maxBarSize={28} />
-              <Bar dataKey="Expense" fill="#FF4E4E" radius={[4, 4, 0, 0]} maxBarSize={28} />
+              <Bar dataKey="Income" fill="#66816A" radius={[4, 4, 0, 0]} maxBarSize={28} />
+              <Bar dataKey="Expense" fill="#AD6252" radius={[4, 4, 0, 0]} maxBarSize={28} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Category Donut Distribution */}
-      <div className="p-5 rounded-2xl bg-[#161616] border border-[#262626] flex flex-col">
+      <div className="p-5 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-subtle)] flex flex-col">
         <div>
-          <h3 className="font-display font-bold text-base text-white">
+          <h3 className="font-display font-bold text-base text-[var(--text-primary)]">
             Distribusi Pengeluaran
           </h3>
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-[var(--text-secondary)]">
             Kategori pengeluaran bulan ini
           </p>
         </div>
 
         <div className="h-56 w-full my-auto">
           {pieData.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-xs text-neutral-500">
+            <div className="h-full flex items-center justify-center text-xs text-[var(--text-muted)]">
               Belum ada pengeluaran bulan ini
             </div>
           ) : (
@@ -159,15 +159,15 @@ export function OverviewCharts() {
                   dataKey="value"
                 >
                   {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} stroke="#161616" strokeWidth={2} />
+                    <Cell key={`cell-${index}`} fill={entry.color} stroke="var(--surface-card)" strokeWidth={2} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1C1C1C', 
-                    border: '1px solid #333', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'var(--surface-card)',
+                    border: '1px solid var(--border-subtle)',
                     borderRadius: '12px',
-                    color: '#fff',
+                    color: 'var(--text-primary)',
                     fontSize: '12px',
                     fontFamily: 'monospace'
                   }}
@@ -179,14 +179,14 @@ export function OverviewCharts() {
         </div>
 
         {/* Top 3 Breakdown List */}
-        <div className="space-y-1.5 pt-2 border-t border-[#222]">
+        <div className="space-y-1.5 pt-2 border-t border-[var(--border-subtle)]">
           {pieData.slice(0, 3).map((item, idx) => (
             <div key={idx} className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1.5 text-neutral-300 truncate">
+              <span className="flex items-center gap-1.5 text-[var(--text-primary)] truncate">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
                 {item.name}
               </span>
-              <span className="font-mono text-neutral-400 font-medium">
+              <span className="font-mono text-[var(--text-secondary)] font-medium">
                 {formatCurrency(item.value, currency, false, exchangeRates)}
               </span>
             </div>

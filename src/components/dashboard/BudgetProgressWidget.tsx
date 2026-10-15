@@ -22,9 +22,9 @@ export function BudgetProgressWidget() {
       const spent = transactions
         .filter(t => {
           const td = new Date(t.date);
-          return t.type === 'expense' && 
-                 t.category_id === b.category_id && 
-                 (td.getMonth() + 1) === currentMonth && 
+          return t.type === 'expense' &&
+                 t.category_id === b.category_id &&
+                 (td.getMonth() + 1) === currentMonth &&
                  td.getFullYear() === currentYear;
         })
         .reduce((sum, t) => sum + Number(t.amount), 0);
@@ -40,47 +40,47 @@ export function BudgetProgressWidget() {
     .sort((a, b) => b.percent - a.percent);
 
   return (
-    <div className="p-5 rounded-2xl bg-[#161616] border border-[#262626]">
-      <div className="flex items-center justify-between mb-4">
+    <div className="p-5 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-subtle)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <h3 className="font-display font-bold text-base text-white">
+          <h3 className="font-display font-bold text-base text-[var(--text-primary)]">
             Status Budget Bulan Ini
           </h3>
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-[var(--text-secondary)]">
             Monitoring pemakaian per kategori
           </p>
         </div>
-        <Link 
-          href="/budget" 
-          className="text-xs font-semibold text-[#38BDF8] hover:underline"
+        <Link
+          href="/budget"
+          className="text-xs font-semibold text-[var(--accent-primary)] hover:underline"
         >
           Kelola Budget →
         </Link>
       </div>
 
       {activeBudgets.length === 0 ? (
-        <div className="py-8 text-center text-xs text-neutral-500">
+        <div className="py-8 text-center text-xs text-[var(--text-muted)]">
           Belum ada budget yang diset untuk bulan ini.
         </div>
       ) : (
         <div className="space-y-4">
           {activeBudgets.slice(0, 4).map((b) => {
-            let progressColor = 'bg-[#3EFF9A]';
-            let badgeBg = 'bg-[#3EFF9A]/10 text-[#3EFF9A]';
+            let progressColor = 'bg-[var(--accent-success)]';
+            let badgeBg = 'bg-[var(--accent-success)]/10 text-[var(--accent-success)]';
 
             if (b.percent >= 100) {
-              progressColor = 'bg-[#FF4E4E]';
-              badgeBg = 'bg-[#FF4E4E]/10 text-[#FF4E4E]';
+              progressColor = 'bg-[var(--accent-danger)]';
+              badgeBg = 'bg-[var(--accent-danger)]/10 text-[var(--accent-danger)]';
             } else if (b.percent >= 70) {
-              progressColor = 'bg-[#FFB800]';
-              badgeBg = 'bg-[#FFB800]/10 text-[#FFB800]';
+              progressColor = 'bg-[var(--accent-warning)]';
+              badgeBg = 'bg-[var(--accent-warning)]/10 text-[var(--accent-warning)]';
             }
 
             return (
               <div key={b.id} className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-2 text-white font-medium">
-                    <span 
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="flex items-center gap-2 text-[var(--text-primary)] font-medium">
+                    <span
                       className="w-5 h-5 rounded flex items-center justify-center"
                       style={{ backgroundColor: `${b.category?.color}20`, color: b.category?.color }}
                     >
@@ -89,7 +89,7 @@ export function BudgetProgressWidget() {
                     <span>{b.category?.name || 'Kategori'}</span>
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-neutral-400">
+                    <span className="font-mono text-[var(--text-secondary)]">
                       {formatCurrency(b.spent, currency, false, exchangeRates)} / {formatCurrency(b.amount, currency, false, exchangeRates)}
                     </span>
                     <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${badgeBg}`}>
@@ -99,8 +99,8 @@ export function BudgetProgressWidget() {
                 </div>
 
                 {/* Progress bar container */}
-                <div className="h-2 w-full bg-[#222222] rounded-full overflow-hidden">
-                  <div 
+                <div className="h-2 w-full bg-[var(--surface-elevated)] rounded-full overflow-hidden">
+                  <div
                     className={`h-full rounded-full transition-all duration-500 ${progressColor}`}
                     style={{ width: `${Math.min(b.percent, 100)}%` }}
                   />

@@ -1,90 +1,34 @@
 'use client';
 
-import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Receipt, 
-  Plus, 
-  PiggyBank, 
-  WalletCards 
-} from 'lucide-react';
+import { LayoutDashboard, Receipt, Plus, ChartPie, WalletCards } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { NavigationPending } from './NavigationPending';
 
-interface BottomNavProps {
-  onOpenNewTransaction: () => void;
-  hasOverBudget?: boolean;
-}
-
+interface BottomNavProps { onOpenNewTransaction: () => void; hasOverBudget?: boolean; }
+const items = [
+  { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
+  { href: '/transactions', label: 'Transaksi', icon: Receipt },
+  { href: '/budget', label: 'Budget', icon: ChartPie },
+  { href: '/accounts', label: 'Wallet', icon: WalletCards },
+];
 export function BottomNav({ onOpenNewTransaction, hasOverBudget = false }: BottomNavProps) {
   const pathname = usePathname();
-
-  return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#121212]/95 backdrop-blur-lg border-t border-[#222222] px-3 py-2 pb-safe">
-      <div className="flex items-center justify-around relative max-w-md mx-auto">
-        {/* Home */}
-        <Link
-          href="/dashboard"
-          className={cn(
-            "flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all",
-            pathname === '/dashboard' ? "text-[#38BDF8]" : "text-neutral-400 hover:text-neutral-200"
-          )}
-        >
-          <LayoutDashboard className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Home</span>
-        </Link>
-
-        {/* Transactions */}
-        <Link
-          href="/transactions"
-          className={cn(
-            "flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all",
-            pathname?.startsWith('/transactions') ? "text-[#38BDF8]" : "text-neutral-400 hover:text-neutral-200"
-          )}
-        >
-          <Receipt className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Transaksi</span>
-        </Link>
-
-        {/* Center Floating Action Button (FAB) */}
-        <div className="-mt-7">
-          <button
-            onClick={onOpenNewTransaction}
-            className="w-13 h-13 rounded-full bg-[#38BDF8] flex items-center justify-center text-black shadow-[0_0_20px_rgba(56,189,248,0.45)] active:scale-95 transition-transform border-4 border-[#121212]"
-            aria-label="Tambah Transaksi"
-          >
-            <Plus className="w-6 h-6 stroke-[3]" />
-          </button>
-        </div>
-
-        {/* Budget */}
-        <Link
-          href="/budget"
-          className={cn(
-            "flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all relative",
-            pathname?.startsWith('/budget') ? "text-[#38BDF8]" : "text-neutral-400 hover:text-neutral-200"
-          )}
-        >
-          {hasOverBudget && (
-            <span className="absolute top-1 right-3 w-2 h-2 bg-[#FF4E4E] rounded-full animate-pulse shadow-[0_0_6px_#FF4E4E]" />
-          )}
-          <PiggyBank className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Budget</span>
-        </Link>
-
-        {/* Accounts / Wallets */}
-        <Link
-          href="/accounts"
-          className={cn(
-            "flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all",
-            pathname?.startsWith('/accounts') ? "text-[#38BDF8]" : "text-neutral-400 hover:text-neutral-200"
-          )}
-        >
-          <WalletCards className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Akun</span>
-        </Link>
-      </div>
-    </nav>
-  );
+  const renderItem = (item: typeof items[number]) => {
+    const active = pathname.startsWith(item.href);
+    return <Link key={item.href} href={item.href} prefetch={true} aria-current={active ? 'page' : undefined} className={cn('mobile-nav-item relative min-w-0 flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium', active ? 'text-[var(--on-accent)]' : 'text-[var(--text-muted)]')}>
+      <NavigationPending />
+      <item.icon className="w-5 h-5" strokeWidth={active ? 2 : 1.6} />
+      <span className="mobile-nav-label">{item.label}</span>
+      {item.href === '/budget' && hasOverBudget && <span className="absolute top-1 right-1/4 w-1.5 h-1.5 rounded-full bg-[var(--accent-danger)]" />}
+    </Link>;
+  };
+  return <nav aria-label="Navigasi utama" className="mobile-nav md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 pt-1">
+    <div className="grid grid-cols-5 items-center gap-1 max-w-lg mx-auto">
+      {items.slice(0, 2).map(renderItem)}
+      <button onClick={onOpenNewTransaction} aria-label="Catat transaksi" className="w-11 h-11 mx-auto rounded-xl bg-[var(--accent-primary)] text-[var(--on-accent)] flex items-center justify-center"><Plus className="w-5 h-5" /></button>
+      {items.slice(2).map(renderItem)}
+    </div>
+  </nav>;
 }

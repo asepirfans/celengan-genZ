@@ -1,101 +1,57 @@
-import { NextResponse } from 'next/server';
-import pool from '@/lib/db';
 import bcrypt from 'bcryptjs';
-
+import pool from '@/lib/db';
+import { assert, atomic, failure, ok, text } from '@/lib/server/api';
+import { checkOrigin, createSession, destroySession, hash, PROFILE_COLUMNS } from '@/lib/server/auth';
+export async function DELETE(req: Request) { try {
+    await destroySession(req);
+    return ok();
+}
+catch (error) {
+    return failure(error);
+} }
 export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const { action, email, password, full_name, currency = 'IDR' } = body;
-
-    const normalizedEmail = email ? email.trim().toLowerCase() : '';
-
-    if (!normalizedEmail || !password) {
-      return NextResponse.json({ success: false, error: 'Email dan password wajib diisi!' }, { status: 400 });
-    }
-
-    if (action === 'register') {
-      // Check if email already exists
-      const checkRes = await pool.query('SELECT * FROM profiles WHERE email = $1', [normalizedEmail]);
-      if (checkRes.rows.length > 0) {
-        return NextResponse.json({ success: false, error: 'Email ini sudah terdaftar. Silakan login!' }, { status: 400 });
-      }
-
-      // Hash password securely with bcrypt (salt rounds = 10)
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-
-      // Create new profile user with hashed password
-      const name = full_name?.trim() || normalizedEmail.split('@')[0];
-      const insertRes = await pool.query(
-        `INSERT INTO profiles (email, password, full_name, currency, avatar_url)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id, email, full_name, currency, avatar_url, created_at`,
-        [normalizedEmail, hashedPassword, name, currency, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80']
-      );
-
-      const newUser = insertRes.rows[0];
-
-      // Auto create default accounts for this new user in Supabase
-      await pool.query(`
-        INSERT INTO accounts (user_id, name, type, icon, color, initial_balance) VALUES
-        ($1, 'Rekening Bank', 'bank', 'landmark', '#00529C', 0),
-        ($1, 'E-Wallet / GoPay', 'ewallet', 'smartphone', '#00AED6', 0),
-        ($1, 'Dompet Tunai', 'cash', 'banknote', '#38BDF8', 0)
-      `, [newUser.id]);
-
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Registrasi berhasil!', 
-        user: newUser 
-      });
-    }
-
-    if (action === 'login') {
-      // Find user by email in database
-      const userRes = await pool.query('SELECT * FROM profiles WHERE email = $1', [normalizedEmail]);
-      
-      if (userRes.rows.length === 0) {
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Akun belum terdaftar! Silakan lakukan Registrasi terlebih dahulu.' 
-        }, { status: 404 });
-      }
-
-      const user = userRes.rows[0];
-
-      // Compare password with bcrypt hash (or fallback for older plain text rows)
-      let isMatch = false;
-      if (user.password?.startsWith('$2a$') || user.password?.startsWith('$2b$')) {
-        isMatch = await bcrypt.compare(password, user.password);
-      } else {
-        isMatch = user.password === password;
-        // Upgrade legacy plain password to bcrypt hash on login
-        if (isMatch) {
-          const salt = await bcrypt.genSalt(10);
-          const newHashed = await bcrypt.hash(password, salt);
-          await pool.query('UPDATE profiles SET password = $1 WHERE id = $2', [newHashed, user.id]);
+    try {
+        checkOrigin(req);
+        const body = await req.json();
+        const email = text(body.email, 254).toLowerCase();
+        assert(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 'Email tidak valid.');
+        assert(typeof body.password === 'string' && body.password.length > 0 && body.password.length <= 128, 'Password wajib diisi.');
+        const password = body.password;
+        assert(['login', 'register'].includes(body.action), 'Aksi tidak valid.');
+        const attemptKey = hash(email);
+        const attempts = await pool.query("INSERT INTO auth_attempts(key,attempts,reset_at) VALUES($1,1,now()+interval '15 minutes') ON CONFLICT(key) DO UPDATE SET attempts=CASE WHEN auth_attempts.reset_at<now() THEN 1 ELSE auth_attempts.attempts+1 END,reset_at=CASE WHEN auth_attempts.reset_at<now() THEN now()+interval '15 minutes' ELSE auth_attempts.reset_at END RETURNING attempts", [attemptKey]);
+        assert(attempts.rows[0].attempts <= 10, 'Terlalu banyak percobaan. Coba lagi dalam 15 menit.', 429);
+        let user;
+        if (body.action === 'register') {
+            assert(password.length >= 8, 'Password minimal 8 karakter.');
+            const existing = await pool.query('SELECT id FROM profiles WHERE lower(email)=$1', [email]);
+            assert(!existing.rows[0], 'Email sudah terdaftar.', 409);
+            const hashed = await bcrypt.hash(password, 12);
+            user = await atomic(async (client) => {
+                await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [email]);
+                const check = await client.query('SELECT id FROM profiles WHERE lower(email)=$1', [email]);
+                assert(!check.rows[0], 'Email sudah terdaftar.', 409);
+                const result = await client.query('INSERT INTO profiles(email,password,full_name,currency) VALUES($1,$2,$3,$4) RETURNING ' + PROFILE_COLUMNS, [email, hashed, body.full_name ? text(body.full_name) : email.split('@')[0], 'IDR']);
+                await client.query("INSERT INTO accounts(user_id,name,type,icon,color,initial_balance) VALUES($1,'Rekening Bank','bank','landmark','#52613d',0),($1,'E-Wallet','ewallet','smartphone','#52613d',0),($1,'Dompet Tunai','cash','banknote','#52613d',0)", [result.rows[0].id]);
+                return result.rows[0];
+            });
         }
-      }
-
-      if (!isMatch) {
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Kata sandi salah. Silakan coba lagi!' 
-        }, { status: 401 });
-      }
-
-      // Return user without leaking password hash
-      const { password: _, ...safeUser } = user;
-
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Login berhasil!', 
-        user: safeUser 
-      });
+        else {
+            const result = await pool.query('SELECT ' + PROFILE_COLUMNS + ',password FROM profiles WHERE lower(email)=$1', [email]);
+            const record = result.rows[0];
+            const match = record?.password?.startsWith('$2') ? await bcrypt.compare(password, record.password) : Boolean(record?.password && record.password === password);
+            assert(match, 'Email atau password salah.', 401);
+            if (!record.password.startsWith('$2'))
+                await pool.query('UPDATE profiles SET password=$1 WHERE id=$2', [await bcrypt.hash(password, 12), record.id]);
+            const { password: omitted, ...safe } = record;
+            void omitted;
+            user = safe;
+        }
+        await createSession(user.id, req);
+        await pool.query('DELETE FROM auth_attempts WHERE key=$1', [attemptKey]);
+        return Response.json({ success: true, user }, { headers: { 'Cache-Control': 'no-store' } });
     }
-
-    return NextResponse.json({ success: false, error: 'Aksi tidak dikenali' }, { status: 400 });
-  } catch (error: any) {
-    console.error('API /api/auth error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
+    catch (error) {
+        return failure(error);
+    }
 }

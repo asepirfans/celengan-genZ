@@ -23,10 +23,11 @@ const monoFont = JetBrains_Mono({
 });
 
 export const viewport: Viewport = {
-  themeColor: '#0D0D0D',
+  themeColor: [{ media: '(prefers-color-scheme: light)', color: '#f5f3ed' }, { media: '(prefers-color-scheme: dark)', color: '#191c18' }],
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
+  viewportFit: 'cover',
 };
 
 export const metadata: Metadata = {
@@ -52,8 +53,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} dark`}>
-      <body className="min-h-screen bg-[#0D0D0D] text-[#F5F5F5] antialiased selection:bg-[#38BDF8] selection:text-[#0D0D0D]">
+    <html lang="id" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} light`}>
+      <body className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-primary)] selection:text-[var(--on-accent)]">
         <AppProvider>
           <ModalProvider>
             {children}

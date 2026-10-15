@@ -1,21 +1,21 @@
 'use client';
 
 import React from 'react';
+import { ChickenLogo } from '@/components/ui/ChickenLogo';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Receipt, 
-  PiggyBank, 
-  WalletCards, 
-  BarChart3, 
-  Settings, 
-  Plus, 
-  ChevronLeft, 
+import {
+  LayoutDashboard,
+  Receipt,
+  ChartPie,
+  WalletCards,
+  BarChart3,
+  Settings,
+  Plus,
+  ChevronLeft,
   ChevronRight,
   LogOut,
   LogIn,
-  Sparkles,
   ShieldCheck,
   Target,
   Users
@@ -24,6 +24,7 @@ import { useApp } from '@/lib/store';
 import { useModal } from '@/components/ui/CustomModal';
 import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
+import { NavigationPending } from './NavigationPending';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -42,7 +43,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onOpenNewTransaction }: S
     { label: 'Transaksi', href: '/transactions', icon: Receipt },
     { label: 'Celengan Impian', href: '/goals', icon: Target },
     { label: 'Split Bill', href: '/split-bill', icon: Users },
-    { label: 'Budget', href: '/budget', icon: PiggyBank },
+    { label: 'Budget', href: '/budget', icon: ChartPie },
     { label: 'Dana Darurat', href: '/emergency-fund', icon: ShieldCheck },
     { label: 'Akun & Wallet', href: '/accounts', icon: WalletCards },
     { label: 'Laporan', href: '/reports', icon: BarChart3 },
@@ -56,38 +57,38 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onOpenNewTransaction }: S
       confirmText: 'Ya, Keluar',
       cancelText: 'Batal',
       type: 'danger',
-      onConfirm: () => {
-        logout();
-        showToast({ message: 'Sampai jumpa lagi! 👋', type: 'info' });
+      onConfirm: async () => {
+        await logout();
+        showToast({ message: 'Sampai jumpa lagi! ', type: 'info' });
         router.push('/login');
       }
     });
   };
 
   return (
-    <aside 
+    <aside
       className={cn(
-        "hidden md:flex flex-col fixed top-0 left-0 bottom-0 z-30 bg-[#121212] border-r border-[#222222] transition-all duration-300 select-none",
+        "app-sidebar hidden md:flex flex-col fixed top-0 left-0 bottom-0 z-30 bg-[var(--surface-card)] border-r border-[var(--border-subtle)] transition-all duration-300 select-none",
         isCollapsed ? "w-20" : "w-64"
       )}
     >
       {/* Brand Header */}
-      <div className="h-20 flex items-center justify-between px-5 border-b border-[#1E1E1E]">
+      <div className="h-20 flex items-center justify-between px-5 border-b border-[var(--border-subtle)]">
         {!isCollapsed ? (
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#38BDF8] flex items-center justify-center text-black font-black text-xl shadow-[0_0_15px_rgba(56,189,248,0.3)]">
-              💸
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-primary)] flex items-center justify-center text-[var(--on-accent)] font-semibold text-xl ">
+              <ChickenLogo className="w-6 h-6" strokeWidth={1.6} />
             </div>
             <div>
-              <span className="font-display font-extrabold text-lg tracking-tight text-white block">
-                CELENGAN<span className="text-[#38BDF8]">.</span>GENZ
+              <span className="brand-name text-lg tracking-tight text-[var(--text-primary)] block">
+                Celengan<span className="text-[var(--accent-primary)]">GenZ</span>
               </span>
             </div>
           </Link>
         ) : (
           <Link href="/dashboard" className="mx-auto">
-            <div className="w-10 h-10 rounded-xl bg-[#38BDF8] flex items-center justify-center text-black font-black text-xl shadow-[0_0_15px_rgba(56,189,248,0.3)]">
-              💸
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-primary)] flex items-center justify-center text-[var(--on-accent)] font-black text-xl ">
+              <ChickenLogo className="w-6 h-6" strokeWidth={1.6} />
             </div>
           </Link>
         )}
@@ -95,7 +96,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onOpenNewTransaction }: S
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className={cn(
-            "p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-[#1F1F1F] transition-colors",
+            "p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)] transition-colors",
             isCollapsed && "mx-auto mt-2"
           )}
           title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
@@ -109,7 +110,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onOpenNewTransaction }: S
         <button
           onClick={onOpenNewTransaction}
           className={cn(
-            "w-full flex items-center justify-center gap-2 py-3 bg-[#38BDF8] text-black font-bold font-display rounded-xl hover:bg-[#60a5fa] transition-all shadow-[0_0_20px_rgba(56,189,248,0.25)] active:scale-[0.98]",
+            "w-full flex items-center justify-center gap-2 py-3 bg-[var(--accent-primary)] text-[var(--on-accent)] font-bold font-display rounded-xl hover:bg-[var(--accent-hover)] transition-all  active:scale-[0.98]",
             isCollapsed && "p-3 rounded-xl"
           )}
           title="Tambah Transaksi Baru"
@@ -129,22 +130,25 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onOpenNewTransaction }: S
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 "flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium transition-all group relative",
-                isActive 
-                  ? "bg-[#1C1C1C] text-white border border-[#2E2E2E]" 
-                  : "text-neutral-400 hover:text-neutral-200 hover:bg-[#181818]"
+                isActive
+                  ? "bg-[var(--nav-active-bg)] text-[var(--accent-primary)] border border-transparent"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)]"
               )}
             >
+              <NavigationPending />
               {isActive && (
-                <div className="absolute left-0 top-2 bottom-2 w-1 bg-[#38BDF8] rounded-r-full shadow-[0_0_8px_#38BDF8]" />
+                <div className="absolute left-0 top-3 bottom-3 w-0.5 bg-[var(--accent-primary)] rounded-r-full " />
               )}
               <Icon className={cn(
                 "w-5 h-5 transition-colors",
-                isActive ? "text-[#38BDF8]" : "text-neutral-400 group-hover:text-white"
+                isActive ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
               )} />
               {!isCollapsed && (
-                <span className={cn(isActive && "font-semibold text-white")}>
+                <span className={cn(isActive && "font-semibold text-[var(--text-primary)]")}>
                   {item.label}
                 </span>
               )}
@@ -155,36 +159,36 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onOpenNewTransaction }: S
 
       {/* Live Spendable Balance Widget on Desktop */}
       {!isCollapsed && (
-        <div className="p-4 mx-3 mb-3 bg-[#171717] border border-[#242424] rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-[11px] text-neutral-400">
+        <div className="p-4 mx-3 mb-3 bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-2xl space-y-1">
+          <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
             <span className="flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-[#38BDF8]" />
+
               Saldo Siap Pakai
             </span>
-            <span className="text-[#3EFF9A] font-mono text-[10px] font-bold">READY</span>
+            <span className="text-[var(--accent-success)] font-mono text-[10px] font-bold">Tersedia</span>
           </div>
-          <p className="text-base font-bold font-mono text-white tracking-tight">
+          <p className="text-base font-bold font-mono text-[var(--text-primary)] tracking-tight">
             {formatCurrency(summary.spendableBalance, profile?.currency || 'IDR', false, exchangeRates)}
           </p>
           {summary.emergencyBalance > 0 && (
-            <p className="text-[10px] text-neutral-500 font-mono">
-              🔒 Vault: {formatCurrency(summary.emergencyBalance, profile?.currency || 'IDR', false, exchangeRates)}
+            <p className="text-[10px] text-[var(--text-muted)] font-mono">
+              Dana darurat: {formatCurrency(summary.emergencyBalance, profile?.currency || 'IDR', false, exchangeRates)}
             </p>
           )}
         </div>
       )}
 
       {/* User Profile & Auth Footer */}
-      <div className="p-3 border-t border-[#1E1E1E]">
+      <div className="p-3 border-t border-[var(--border-subtle)]">
         {isAuthenticated ? (
           <div className="space-y-1">
-            <div 
+            <div
               className={cn(
-                "flex items-center gap-3 p-2 rounded-xl bg-[#171717] border border-[#262626] group",
+                "flex items-center gap-3 p-2 rounded-xl bg-[var(--surface-card)] border border-[var(--border-subtle)] group",
                 isCollapsed && "justify-center p-1"
               )}
             >
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#2A2A2A] to-[#404040] border border-[#333] flex items-center justify-center overflow-hidden font-bold text-xs text-[#38BDF8] shrink-0">
+              <div className="w-9 h-9 rounded-full bg-[var(--surface-card)]   border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden font-bold text-xs text-[var(--accent-primary)] shrink-0">
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover" />
                 ) : (
@@ -193,10 +197,10 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onOpenNewTransaction }: S
               </div>
               {!isCollapsed && (
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-white truncate">
+                  <p className="text-xs font-semibold text-[var(--text-primary)] truncate">
                     {profile?.full_name || 'Pengguna'}
                   </p>
-                  <p className="text-[10px] text-neutral-500 font-mono truncate">
+                  <p className="text-[10px] text-[var(--text-muted)] font-mono truncate">
                     {profile?.currency || 'IDR'} Account
                   </p>
                 </div>
@@ -207,7 +211,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onOpenNewTransaction }: S
             <button
               onClick={handleLogout}
               className={cn(
-                "w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-[#FF6B6B] hover:bg-[#FF4E4E]/10 hover:border-[#FF4E4E]/30 border border-transparent rounded-xl transition-all",
+                "w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-[var(--accent-danger)] hover:bg-[var(--accent-danger)]/10 hover:border-[var(--accent-danger)]/30 border border-transparent rounded-xl transition-all",
                 isCollapsed ? "justify-center px-0" : ""
               )}
               title="Keluar / Logout"
@@ -220,7 +224,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onOpenNewTransaction }: S
           <Link
             href="/login"
             className={cn(
-              "w-full flex items-center gap-2.5 px-3 py-2.5 bg-[#38BDF8] text-black font-bold text-xs rounded-xl hover:bg-[#60a5fa] transition-all justify-center shadow-[0_0_15px_rgba(56,189,248,0.2)]",
+              "w-full flex items-center gap-2.5 px-3 py-2.5 bg-[var(--accent-primary)] text-[var(--on-accent)] font-bold text-xs rounded-xl hover:bg-[var(--accent-hover)] transition-all justify-center ",
               isCollapsed && "px-0"
             )}
             title="Masuk / Login"

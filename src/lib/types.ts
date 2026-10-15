@@ -67,6 +67,8 @@ export interface Budget {
 }
 
 export interface SavingsGoal {
+  account_id?: string;
+  legacy_amount?: number;
   id: string;
   user_id: string;
   title: string;
@@ -89,4 +91,12 @@ export interface FinancialSummary {
   monthlyExpenseLimit?: number;
   netCashflow: number;
   savingsRate: number;
+}
+
+export interface EmergencyFund {
+ profile_type: 'single'|'married'|'freelance'; monthly_expense: number; target_months: number; selected_account_ids:string[];
+}
+export interface SplitBill {
+ id:string; title:string; subtotal:number; total:number; tax_percent:number; service_percent:number; split_mode:'equal'|'custom';payment_account:string;created_at:string;
+ participants:{id:string;name:string;subtotal:number;amount:number;paid:boolean}[];
 }

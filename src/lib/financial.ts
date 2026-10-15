@@ -1,0 +1,7 @@
+import type { Account, Budget, Transaction } from './types';
+export function categorySpent(transactions: Transaction[], categoryId: string, month: number, year: number) { return transactions.filter(t => { const d = new Date(t.date); return t.type === 'expense' && t.category_id === categoryId && d.getMonth() + 1 === month && d.getFullYear() === year; }).reduce((sum, t) => sum + Number(t.amount), 0); }
+export function overBudget(budgets: Budget[], transactions: Transaction[], month: number, year: number) { return budgets.some(b => b.month === month && b.year === year && categorySpent(transactions, b.category_id, month, year) > Number(b.amount)); }
+export function accountBalances(accounts: Account[], transactions: Transaction[]): Account[] { return accounts.map(account => ({ ...account, current_balance: transactions.reduce((balance, t) => { let delta = 0; if (t.account_id === account.id)
+        delta = t.type === 'income' ? Number(t.amount) : -Number(t.amount); if (t.type === 'transfer' && t.transfer_to_account_id === account.id)
+        delta += Number(t.amount); return balance + delta; }, Number(account.initial_balance) || 0) })); }
+export function reservedBalances(accounts: Account[], emergencyIds: string[], goalIds: string[]) { const active = accounts.filter(a => !a.is_archived); return { emergencyBalance: active.filter(a => emergencyIds.includes(a.id)).reduce((sum, a) => sum + a.current_balance, 0), goalBalance: active.filter(a => goalIds.includes(a.id) && !emergencyIds.includes(a.id)).reduce((sum, a) => sum + a.current_balance, 0) }; }
