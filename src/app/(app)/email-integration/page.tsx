@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useApp } from '@/lib/store';
-import EmailSetupGuide from '@/components/email/EmailSetupGuide';
 import { apiRequest, errorMessage } from '@/lib/client-api';
 import type { EmailSuggestion } from '@/lib/inbound-email';
 
@@ -56,7 +55,7 @@ export default function EmailIntegrationPage(){
      {data.address&&<p className="text-sm break-all select-all">{data.address}</p>}{data.provider==='cloudflare'&&<p className="text-xs text-[var(--text-secondary)]">Jika sebelumnya memakai alamat Resend, tambahkan alamat baru ini di Gmail dan ganti tujuan filter bank. Salinan email tersedia untuk dibaca ulang selama 7 hari.</p>}
      <div className="flex flex-wrap gap-2">{data.address&&<button className={secondary} disabled={busy} onClick={()=>void perform(async()=>{try{await navigator.clipboard.writeText(data.address!);setNotice('Alamat disalin.');}catch{throw new Error('Pilih alamat di atas lalu salin secara manual.');}})}>Salin alamat</button>}<button className={data.enabled?secondary:primary} disabled={busy} onClick={()=>void perform(async()=>{await apiRequest('/api/email-integration','POST',{action:'inbox',enabled:!data.enabled});await load();setNotice(data.enabled?'Penerimaan email dijeda.':'Penerimaan email diaktifkan.');})}>{data.enabled?'Jeda':'Aktifkan penerimaan'}</button></div>
      {data.forwarding_sender&&<div className="text-xs space-y-2"><p className="break-all">Gmail yang dikenali: {data.forwarding_sender}</p><button disabled={busy} className="underline" onClick={()=>void perform(async()=>{await apiRequest('/api/email-integration','POST',{action:'forwarder',id:null});await load();setNotice('Pengenalan Gmail dihapus. Email dari alamat ini akan diperiksa kembali.');})}>Hapus pengenalan Gmail</button></div>}
-     <EmailSetupGuide address={data.address} busy={busy} hasConfirmation={!!data.confirmation} verification={verification} onCopy={()=>void perform(async()=>{try{await navigator.clipboard.writeText(data.address!);setNotice('Alamat disalin.');}catch{throw new Error('Pilih alamat di atas lalu salin secara manual.');}})} onConfirmation={()=>void perform(async()=>{if(data.confirmation)setVerification(await apiRequest('/api/email-integration','POST',{action:'verification',id:data.confirmation.id}));})} onRefresh={()=>void perform(refresh)}/>
+     {data.confirmation&&<button disabled={busy} className={secondary} onClick={()=>void perform(async()=>{setVerification(await apiRequest('/api/email-integration','POST',{action:'verification',id:data.confirmation!.id}));})}>Buka konfirmasi Gmail</button>}{verification&&<div className="space-y-2 text-sm">{verification.url&&<a href={verification.url} target="_blank" rel="noopener noreferrer" className="inline-block py-2 underline">Konfirmasi penerusan di Gmail</a>}{verification.code&&<p>Kode konfirmasi: <span className="select-all font-mono">{verification.code}</span></p>}</div>}
     </>}
    </section>
    <section className={card+' space-y-4'} aria-label="Rekening terhubung">
