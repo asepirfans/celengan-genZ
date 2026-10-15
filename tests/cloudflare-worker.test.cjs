@@ -4,7 +4,7 @@ const env = { EMAIL_SECRET: secret, EMAIL_DOMAIN: 'inbound.example.invalid', WEB
 const to = 'wallet-' + 'a'.repeat(48) + '@inbound.example.invalid';
 const raw = 'From: bank@example.invalid\r\nSubject: Payment\r\n\r\nAmount Rp 100';
 const message = () => ({ to, rawSize: Buffer.byteLength(raw), raw: new Response(raw).body, setReject: () => assert.fail('Valid message rejected') });
-function checkSignature(options) { assert.equal(options.headers['x-email-signature'], createHmac('sha256', secret).update(options.headers['x-email-timestamp'] + '.' + options.body).digest('hex')); }
+function checkSignature(options) { assert.equal(options.redirect, 'manual'); assert.equal(options.headers['x-email-signature'], createHmac('sha256', secret).update(options.headers['x-email-timestamp'] + '.' + options.body).digest('hex')); }
 
 test('Worker sends stable identity and signed MIME without R2; queued database acknowledgement is accepted', async () => {
   const worker = (await import('../cloudflare/email-worker/worker.mjs')).default, original = global.fetch;
@@ -25,7 +25,7 @@ test('Worker sends stable identity and signed MIME without R2; queued database a
 test('Worker propagates failures and unrelated 2xx responses instead of losing email silently', async () => {
   const worker = (await import('../cloudflare/email-worker/worker.mjs')).default, original = global.fetch;
   try {
-    for (const response of [new Response('down', { status: 503 }), new Response('{}'), new Response(JSON.stringify({ success: true, data: { retried: true } }))]) {
+    for (const response of [new Response('redirect', { status: 307, headers: { location: 'https://elsewhere.example.invalid' } }), new Response('down', { status: 503 }), new Response('{}'), new Response(JSON.stringify({ success: true, data: { retried: true } }))]) {
       global.fetch = async () => response;
       await assert.rejects(() => worker.email(message(), env), /not acknowledged/);
     }

@@ -10,7 +10,8 @@ async function send(payload, env, retry = false) {
   const target = new URL(env.WEBHOOK_URL);
   if (target.protocol !== 'https:' || target.pathname !== '/api/webhooks/cloudflare-email' || target.username || target.password || target.search || target.hash) throw new Error('Webhook URL invalid');
   const timestamp = String(Math.floor(Date.now() / 1000)), body = JSON.stringify(payload);
-  const response = await fetch(target, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-email-timestamp': timestamp, 'x-email-signature': await signature(body, timestamp, env.EMAIL_SECRET) }, body, signal: AbortSignal.timeout(15000) });
+  // Workers supports manual/follow only. Never forward signed email bodies to redirects.
+  const response = await fetch(target, { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/json', 'x-email-timestamp': timestamp, 'x-email-signature': await signature(body, timestamp, env.EMAIL_SECRET) }, body, signal: AbortSignal.timeout(15000) });
   const result = await response.json().catch(() => null);
   const acknowledged = retry ? result?.data?.retried === true : result?.data?.received === true || result?.data?.ignored === true;
   if (!response.ok || result?.success !== true || !acknowledged) throw new Error('Webhook not acknowledged; email was not confirmed stored');
